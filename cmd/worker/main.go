@@ -1,7 +1,31 @@
 package main
 
-import "fmt"
+import (
+	"context"
+	"os/signal"
+	"syscall"
+
+	"github.com/timur-danilchenko/metric-bridge/internal/config"
+	"go.uber.org/zap"
+)
+
+var configPath = "./configs"
 
 func main() {
-	fmt.Println("Hello from MetricBridge!")
+	logger := zap.NewExample().Sugar()
+	defer logger.Sync()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		logger.Fatalf("Can't load config: %v", err)
+	}
+
+	logger.Infof("Loaded config from %s", configPath)
+	logger.Info("MetricBridge worker started. Press Ctrl+C to exit.")
+
+	<-ctx.Done()
+	logger.Info("Shutting down gracefully...")
 }
