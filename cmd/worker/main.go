@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/timur-danilchenko/metric-bridge/internal/config"
+	"github.com/timur-danilchenko/metric-bridge/internal/kafka"
 	"go.uber.org/zap"
 )
 
@@ -25,6 +26,11 @@ func main() {
 
 	logger.Infof("Loaded config from %s", configPath)
 	logger.Info("MetricBridge worker started. Press Ctrl+C to exit.")
+
+	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, logger)
+	defer consumer.Close()
+
+	go consumer.Start(ctx)
 
 	<-ctx.Done()
 	logger.Info("Shutting down gracefully...")
