@@ -7,6 +7,7 @@ import (
 
 	"github.com/timur-danilchenko/metric-bridge/internal/config"
 	"github.com/timur-danilchenko/metric-bridge/internal/kafka"
+	"github.com/timur-danilchenko/metric-bridge/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -19,12 +20,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Inintializing config
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		logger.Fatalf("Can't load config: %v", err)
 	}
-
 	logger.Infof("Loaded config from %s", configPath)
+
+	// Initializing repository
+	repo, err := storage.NewRepository(ctx, cfg.Postgres)
+	if err != nil {
+		logger.Fatalf("Failed to init repository", err)
+	}
+	defer repo.Close(ctx)
+
 	logger.Info("MetricBridge worker started. Press Ctrl+C to exit.")
 
 	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, logger)
