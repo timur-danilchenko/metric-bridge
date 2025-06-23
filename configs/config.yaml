@@ -3,12 +3,5 @@ kafka:
     - "localhost:9092"
   topic: "metrics"
 
-postgres:
-  host: "localhost"
-  port: 5432
-  user: "user"
-  password: "password"
-  dbname: "metrics"
-
 prometheus:
   port: 2112
