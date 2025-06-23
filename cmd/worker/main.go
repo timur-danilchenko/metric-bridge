@@ -7,6 +7,7 @@ import (
 
 	"github.com/timur-danilchenko/metric-bridge/internal/config"
 	"github.com/timur-danilchenko/metric-bridge/internal/kafka"
+	"github.com/timur-danilchenko/metric-bridge/internal/processor"
 	"github.com/timur-danilchenko/metric-bridge/internal/storage"
 	"go.uber.org/zap"
 )
@@ -34,9 +35,18 @@ func main() {
 	}
 	defer repo.Close(ctx)
 
+	// Initializing processor
+	processor := processor.NewProcessor(logger, repo)
+
 	logger.Info("MetricBridge worker started. Press Ctrl+C to exit.")
 
-	consumer := kafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topic, logger)
+	// Creating consumer
+	consumer := kafka.NewConsumer(
+		cfg.Kafka.Brokers,
+		cfg.Kafka.Topic,
+		logger,
+		processor,
+	)
 	defer consumer.Close()
 
 	go consumer.Start(ctx)

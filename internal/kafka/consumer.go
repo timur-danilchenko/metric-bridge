@@ -11,11 +11,12 @@ import (
 )
 
 type Consumer struct {
-	Reader *kafka.Reader
-	Logger *zap.SugaredLogger
+	reader    *kafka.Reader
+	logger    *zap.SugaredLogger
+	processor *processor.Processor
 }
 
-func NewConsumer(brokers []string, topic string, logger *zap.SugaredLogger) *Consumer {
+func NewConsumer(brokers []string, topic string, logger *zap.SugaredLogger, processor *processor.Processor) *Consumer {
 	readerCfg := kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
@@ -24,37 +25,42 @@ func NewConsumer(brokers []string, topic string, logger *zap.SugaredLogger) *Con
 		MaxBytes: 1e6, // 1MB
 	}
 
-	r := kafka.NewReader(readerCfg)
+	reader := kafka.NewReader(readerCfg)
 
 	return &Consumer{
-		Reader: r,
-		Logger: logger,
+		reader:    reader,
+		logger:    logger,
+		processor: processor,
 	}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
 	for {
-		m, err := c.Reader.ReadMessage(ctx)
+		msg, err := c.reader.ReadMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				c.Logger.Info("Kafka consumer context canceled, shutting down.")
+				c.logger.Info("Kafka consumer context canceled, shutting down.")
 				return
 			}
-			c.Logger.Errorf("Failed to read message: %v", err)
+			c.logger.Errorf("Failed to read message: %v", err)
 			continue
 		}
 
 		var metric model.Metric
-		if err := json.Unmarshal(m.Value, &metric); err != nil {
-			c.Logger.Errorf("Invalid JSON metric: %v", err)
+		if err := json.Unmarshal(msg.Value, &metric); err != nil {
+			c.logger.Errorf("Invalid JSON metric: %v", err)
 			continue
 		}
 
-		processor.Handle(metric, c.Logger)
-		// c.Logger.Infof("Received message: %s", string(m.Value))
+		if err := c.processor.Handle(ctx, metric); err != nil {
+			c.logger.Errorf("Failed to process metric: %v", err)
+			continue
+		}
+
+		c.logger.Infof("Metric processed: %+v", metric)
 	}
 }
 
 func (c *Consumer) Close() error {
-	return c.Reader.Close()
+	return c.reader.Close()
 }

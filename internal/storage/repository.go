@@ -38,6 +38,10 @@ func (r *Repository) Close(ctx context.Context) error {
 func (r *Repository) SaveMetric(ctx context.Context, metric model.Metric) error {
 	_, err := r.conn.Exec(ctx,
 		`INSERT INTO metrics (type, value, timestamp) VALUES ($1, $2, $3)`,
-		metric.Type, metric.Value, metric.Timestamp)
+		metric.Type,
+		metric.Value,
+		metric.Timestamp,
+	)
+
 	return err
 }
