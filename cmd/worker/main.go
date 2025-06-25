@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os/signal"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/timur-danilchenko/metric-bridge/internal/config"
 	"github.com/timur-danilchenko/metric-bridge/internal/kafka"
+	"github.com/timur-danilchenko/metric-bridge/internal/metrics"
 	"github.com/timur-danilchenko/metric-bridge/internal/processor"
 	"github.com/timur-danilchenko/metric-bridge/internal/storage"
 	"go.uber.org/zap"
@@ -49,7 +53,20 @@ func main() {
 	)
 	defer consumer.Close()
 
+	// Starting consumer work
 	go consumer.Start(ctx)
+
+	// Register metrics
+	metrics.Register()
+
+	// Handling metrics requests
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Prometheus.Port), nil)
+		if err != nil {
+			logger.Fatalf("Failed to start Prometheus HTTP server: %v", err)
+		}
+	}()
 
 	<-ctx.Done()
 	logger.Info("Shutting down gracefully...")
