@@ -13,10 +13,10 @@ import (
 
 type Processor struct {
 	logger *zap.SugaredLogger
-	repo   *storage.Repository
+	repo   storage.Repository
 }
 
-func NewProcessor(logger *zap.SugaredLogger, repo *storage.Repository) *Processor {
+func NewProcessor(logger *zap.SugaredLogger, repo storage.Repository) *Processor {
 	return &Processor{
 		logger: logger,
 		repo:   repo,
@@ -34,6 +34,7 @@ func (p *Processor) Handle(ctx context.Context, metric model.Metric) error {
 
 	err := p.repo.SaveMetric(ctx, metric)
 	if err != nil {
+		p.logger.Errorf("Failed to save metric: %v", err)
 		metrics.ProcessingErrors.Inc()
 		return err
 	}
