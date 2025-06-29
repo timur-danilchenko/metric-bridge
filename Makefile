@@ -59,3 +59,16 @@ prometheus:
 # Открывает интерфейс Prometheus в браузере
 open_prometheus:
 	open http://localhost:9090
+
+# ==== Тестирование ====
+# Запуск всех модульных тестов
+test:
+	go test ./... -v
+
+# Запуск только модулей processor
+test_processor:
+	go test ./internal/processor -v
+
+# (в будущем) Интеграционные тесты
+test_integration:
+	go test ./internal/tests -tags=integration -v

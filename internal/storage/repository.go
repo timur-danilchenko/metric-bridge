@@ -9,11 +9,11 @@ import (
 	"github.com/timur-danilchenko/metric-bridge/internal/model"
 )
 
-type Repository struct {
+type Repo struct {
 	conn *pgx.Conn
 }
 
-func NewRepository(ctx context.Context, cfg config.PostgresConfig) (*Repository, error) {
+func NewRepository(ctx context.Context, cfg config.PostgresConfig) (*Repo, error) {
 	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		cfg.User,
@@ -28,14 +28,14 @@ func NewRepository(ctx context.Context, cfg config.PostgresConfig) (*Repository,
 	if err != nil {
 		return nil, err
 	}
-	return &Repository{conn: conn}, nil
+	return &Repo{conn: conn}, nil
 }
 
-func (r *Repository) Close(ctx context.Context) error {
+func (r *Repo) Close(ctx context.Context) error {
 	return r.conn.Close(ctx)
 }
 
-func (r *Repository) SaveMetric(ctx context.Context, metric model.Metric) error {
+func (r *Repo) SaveMetric(ctx context.Context, metric model.Metric) error {
 	_, err := r.conn.Exec(ctx,
 		`INSERT INTO metrics (type, value, timestamp) VALUES ($1, $2, $3)`,
 		metric.Type,
@@ -45,3 +45,6 @@ func (r *Repository) SaveMetric(ctx context.Context, metric model.Metric) error 
 
 	return err
 }
+
+// Compile-time проверка, что *Repo реализует интерфейс Repository
+var _ Repository = (*Repo)(nil)
