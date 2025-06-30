@@ -27,32 +27,32 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      kafka:
-        image: bitnami/kafka:latest
-        env:
-          KAFKA_BROKER_ID: 1
-          KAFKA_CFG_ZOOKEEPER_CONNECT: localhost:2181
-          KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-          ALLOW_PLAINTEXT_LISTENER: yes
-        ports:
-          - 9092:9092
-        # Add healthchecks
-        # options: >-
-        #   --health-cmd "curl -f localhost:9092 || exit 1"
-        #   --health-interval 10s
-        #   --health-timeout 5s
-        #   --health-retries 10
-
       zookeeper:
         image: bitnami/zookeeper:latest
         env:
-          ALLOW_ANONYMOUS_LOGIN: yes
+          ALLOW_ANONYMOUS_LOGIN: "yes"
         ports:
           - 2181:2181
         # Add healthchecks
         # options: >-
         #   --health-cmd "echo ruok | nc localhost 2181 | grep imok"
+        #   --health-interval 10s
+        #   --health-timeout 5s
+        #   --health-retries 10
+
+      kafka:
+        image: bitnami/kafka:latest
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_CFG_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_CFG_LISTENERS: PLAINTEXT://0.0.0.0:9092
+          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          ALLOW_PLAINTEXT_LISTENER: "yes"
+        ports:
+          - 9092:9092
+        # Add healthchecks
+        # options: >-
+        #   --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
         #   --health-interval 10s
         #   --health-timeout 5s
         #   --health-retries 10
@@ -65,27 +65,46 @@ jobs:
       DB_PORT: 5432
       DB_SSLMODE: disable
       DB_INTEGRATION_DSN: postgres://postgres:postgres@localhost:5432/metrics?sslmode=disable
+      KAFKA_BROKERS: localhost:9092
+      KAFKA_TOPIC: metrics
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'  # Можно указать 1.23, т.к. ты используешь 1.23.1 локально
 
-    - name: Wait for Kafka and Postgres
-      run: sleep 20
+      - name: Wait for services to be healthy
+        run: sleep 30
+          # echo "Waiting for Postgres to be ready..."
+          # until pg_isready -h localhost -p 5432 -U postgres; do
+          #   sleep 2
+          #   echo "Waiting for Postgres..."
+          # done
 
-    - name: Install Goose
-      run: go install github.com/pressly/goose/v3/cmd/goose@latest
+          # echo "Waiting for Zookeeper to be ready..."
+          # until echo ruok | nc localhost 2181 | grep imok; do
+          #   sleep 2
+          #   echo "Waiting for Zookeeper..."
+          # done
 
-    - name: Install dependencies
-      run: go mod tidy
+          # echo "Waiting for Kafka to be ready..."
+          # until kafka-broker-api-versions --bootstrap-server localhost:9092; do
+          #   sleep 2
+          #   echo "Waiting for Kafka..."
+          # done
 
-    - name: Run DB migrations
-      run: make migrate_up
+      - name: Install Goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
-    - name: Run integration tests
-      run: make test_integration
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run database migrations
+        run: make migrate_up
+
+      - name: Run integration tests
+        run: make test_integration
