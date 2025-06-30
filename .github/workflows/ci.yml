@@ -1,17 +1,20 @@
-name: CI Pipeline
+# .github/workflows/ci.yml
+name: CI
 
 on:
   push:
-    branches: [master]
+    branches:
+      - feature/*
   pull_request:
-    branches: [master]
+    branches:
+      - master
 
 jobs:
-  test:
+  integration-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -19,46 +22,70 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
       kafka:
-        image: confluentinc/cp-kafka:7.3.0
+        image: bitnami/kafka:latest
         env:
           KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_CFG_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+          KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          ALLOW_PLAINTEXT_LISTENER: yes
         ports:
           - 9092:9092
-        options: --network-alias kafka
-        needs: zookeeper
+        # Add healthchecks
+        # options: >-
+        #   --health-cmd "curl -f localhost:9092 || exit 1"
+        #   --health-interval 10s
+        #   --health-timeout 5s
+        #   --health-retries 10
 
       zookeeper:
-        image: confluentinc/cp-zookeeper:7.3.0
+        image: bitnami/zookeeper:latest
         env:
-          ZOOKEEPER_CLIENT_PORT: 2181
-          ZOOKEEPER_TICK_TIME: 2000
+          ALLOW_ANONYMOUS_LOGIN: yes
         ports:
           - 2181:2181
-        options: --network-alias zookeeper
+        # Add healthchecks
+        # options: >-
+        #   --health-cmd "echo ruok | nc localhost 2181 | grep imok"
+        #   --health-interval 10s
+        #   --health-timeout 5s
+        #   --health-retries 10
 
     env:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: metrics
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_SSLMODE: disable
       DB_INTEGRATION_DSN: postgres://postgres:postgres@localhost:5432/metrics?sslmode=disable
 
     steps:
-      - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.21
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
 
-      - name: Download Go modules
-        run: go mod tidy
+    - name: Wait for Kafka and Postgres
+      run: sleep 20
 
-      - name: Run integration tests
-        run: go test -tags=integration ./internal/tests -v
+    - name: Install Goose
+      run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+    - name: Install dependencies
+      run: go mod tidy
+
+    - name: Run DB migrations
+      run: make migrate_up
+
+    - name: Run integration tests
+      run: make test_integration
