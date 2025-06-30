@@ -13,11 +13,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// getKafkaBroker возвращает адрес Kafka брокера из env или дефолтное значение
+func getKafkaBroker() string {
+	broker := os.Getenv("KAFKA_BROKERS")
+	if broker == "" {
+		return "kafka:9092" // дефолт для запуска внутри Docker-сети
+	}
+	return broker
+}
+
 func TestKafkaToPostgresFlow(t *testing.T) {
 	ctx := context.Background()
 
+	brokerAddr := getKafkaBroker()
+
 	writer := &kafka.Writer{
-		Addr:     kafka.TCP("kafka:9092"), // или kafka:9092 если тест в docker
+		Addr:     kafka.TCP(brokerAddr),
 		Topic:    "metrics",
 		Balancer: &kafka.LeastBytes{},
 	}
@@ -41,7 +52,7 @@ func TestKafkaToPostgresFlow(t *testing.T) {
 	assert.NoError(t, err)
 	defer pool.Close()
 
-	// Retry check
+	// Retry check для появления данных в базе
 	found := false
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
