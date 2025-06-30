@@ -21,6 +21,22 @@ compose_up:
 compose_down:
 	@docker-compose --env-file .env -f docker/docker-compose.yml down
 
+# Поднимает все сервисы для тестов: Kafka, Zookeeper, Postgres, Prometheus
+compose_test_up:
+	@docker-compose --env-file .env -f docker/docker-compose.test.yml up
+
+# Останавливает и удаляет все тестовые контейнеры, созданные docker-compose
+compose_test_down:
+	@docker-compose --env-file .env -f docker/docker-compose.test.yml down
+
+# Поднимает все сервисы для CI/CD: Kafka, Zookeeper, Postgres, Prometheus
+compose_ci:
+	@docker-compose --env-file .env -f docker/docker-compose.ci.yml up -d
+
+# Останавливает и удаляет все контейнеры, созданные docker-compose для CI/CD
+compose_ci_down:
+	@docker-compose --env-file .env -f docker/docker-compose.ci.yml down
+
 # ==== Миграции ====
 # Применяет все миграции к базе данных
 migrate_up: ensure_db
@@ -54,21 +70,41 @@ ensure_db:
 # ==== Работа с Prometheus ====
 # Поднимает только сервис Prometheus
 prometheus:
-	docker-compose --env-file .env -f docker/docker-compose.yml up -d prometheus
+	@docker-compose --env-file .env -f docker/docker-compose.yml up -d prometheus
 
 # Открывает интерфейс Prometheus в браузере
 open_prometheus:
-	open http://localhost:9090
+	@open http://localhost:9090
 
 # ==== Тестирование ====
 # Запуск всех модульных тестов
 test:
-	go test ./... -v
+	@go test ./... -v
 
 # Запуск только модулей processor
 test_processor:
-	go test ./internal/processor -v
+	@go test -tags=unit-test-processor ./internal/processor -v
 
-# (в будущем) Интеграционные тесты
+# Интеграционные тесты
 test_integration:
-	go test ./internal/tests -tags=integration -v
+	@DB_INTEGRATION_DSN=$(DB_DSN) go test -tags=integration ./internal/tests -v
+
+	# go test -tags=integration ./internal/tests -v
+
+# ==== CI Тестирование ====
+
+# Запускает окружение CI и выполняет интеграционные тесты
+test_ci: compose_ci
+	@echo "Waiting for services to be ready..."
+	@sleep 5
+
+	@echo "Running database migrations..."
+	@$(MAKE) migrate_up
+
+	@sleep 3
+	@echo "Running integration tests..."
+	@DB_INTEGRATION_DSN=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE) \
+		go test -tags=integration ./internal/tests -v
+
+	@echo "🧹 Shutting down CI containers..."
+	@$(MAKE) compose_ci_down
