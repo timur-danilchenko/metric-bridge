@@ -17,7 +17,7 @@ func TestKafkaToPostgresFlow(t *testing.T) {
 	ctx := context.Background()
 
 	writer := &kafka.Writer{
-		Addr:     kafka.TCP("localhost:9092"), // или kafka:9092 если тест в docker
+		Addr:     kafka.TCP("kafka:9092"), // или kafka:9092 если тест в docker
 		Topic:    "metrics",
 		Balancer: &kafka.LeastBytes{},
 	}
