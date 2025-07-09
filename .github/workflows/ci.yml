@@ -42,14 +42,15 @@ jobs:
 
       kafka:
         image: bitnami/kafka:latest
+        ports:
+          - 9092:9092
         env:
           KAFKA_BROKER_ID: 1
           KAFKA_CFG_ZOOKEEPER_CONNECT: localhost:2181
           KAFKA_CFG_LISTENERS: PLAINTEXT://0.0.0.0:9092
           KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
           ALLOW_PLAINTEXT_LISTENER: "yes"
-        ports:
-          - 9092:9092
+        
         # Add healthchecks
         # options: >-
         #   --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
@@ -66,7 +67,6 @@ jobs:
       DB_SSLMODE: disable
       DB_INTEGRATION_DSN: postgres://postgres:postgres@localhost:5432/metrics?sslmode=disable
       KAFKA_BROKERS: localhost:9092
-      KAFKA_TOPIC: metrics
 
     steps:
       - name: Checkout code

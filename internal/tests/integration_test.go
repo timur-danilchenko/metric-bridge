@@ -17,7 +17,7 @@ import (
 func getKafkaBroker() string {
 	broker := os.Getenv("KAFKA_BROKERS")
 	if broker == "" {
-		return "kafka:9092" // дефолт для запуска внутри Docker-сети
+		return "localhost:9092"
 	}
 	return broker
 }
